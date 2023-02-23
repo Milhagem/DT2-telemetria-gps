@@ -1,8 +1,6 @@
 #define TINY_GSM_MODEM_SIM7000
 #define TINY_GSM_RX_BUFFER 1024 // Set RX buffer to 1Kb
 
-#include <TinyGSM.h>
-
 // LilyGO T-SIM7000G Pinout
 #define UART_BAUD   115200
 #define PIN_DTR     25
@@ -12,22 +10,7 @@
 
 #define LED_PIN     12
 
-#include "WiFi.h"
-#include "HTTPClient.h"
-
-#include <Wire.h>
-#include <Wire.h>
-
-// Replace with your network credentials
-const char* ssid     = "SSID_REDE";
-const char* password = "SENHA_REDE";
-
-// REPLACE with your Domain name and URL path or IP address with path
-const char* serverName = "http://milhagemufmg.com/post-data.php";
-
-// Keep this API Key value to be compatible with the PHP code provided in the project page. 
-// If you change the apiKeyValue value, the PHP file /post-data.php also needs to have the same key 
-String apiKeyValue = "API_KEY_VALUE";
+#include <TinyGSM.h>
 
 // Set serial for debug console (to Serial Monitor, default speed 115200)
 #define SerialMon Serial
@@ -36,9 +19,27 @@ String apiKeyValue = "API_KEY_VALUE";
 
 TinyGsm modem(SerialAT);
 
+
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <Wire.h>
+
+// Replace with your network credentials
+const char* ssid     = "SSID_NAME";
+const char* password = "PASSWORD";
+
+// REPLACE with your Domain name and URL path or IP address with path
+const char* serverName = "SERVER_NAME";
+
+// Keep this API Key value to be compatible with the PHP code provided in the server.
+String apiKeyValue = "API_KEY_VALUE";
+
+
 void setup(){
   Serial.begin(115200);
   
+  // ---------- GPS Setup ----------
+
   SerialMon.println("Place your board outside to catch satelite signal");
 
   // Set LED OFF
@@ -71,22 +72,11 @@ void setup(){
   String modemInfo = modem.getModemInfo();
   delay(500);
   SerialMon.println("Modem Info: " + modemInfo);
-
-  Serial.println("All done with GPS! Starting HTTP config...");
-  
-  WiFi.begin(ssid, password);
-  Serial.println("Connecting");
-  while(WiFi.status() != WL_CONNECTED) { 
-    delay(500);
-    Serial.println("WL_NOT_CONNECTED");
-  }
-  Serial.println("");
-  Serial.print("Connected to WiFi network with IP Address: ");
-  Serial.println(WiFi.localIP());
-    
 }
 
 void loop(){
+  // ---------- GPS DATA ----------
+
   // Set SIM7000G GPIO4 HIGH ,turn on GPS power
   // CMD:AT+SGPIO=0,4,1,1
   // Only in version 20200415 is there a function to control GPS power
@@ -131,18 +121,20 @@ void loop(){
     }
   }
 
-  //Check WiFi connection status
+  // ---------- Preparing HTTP request ----------
+  
+  // Check WiFi connection status
   if(WiFi.status()== WL_CONNECTED){
     WiFiClient client;
     HTTPClient http;
     
-    // Your Domain name with URL path or IP address with path
+    // Domain name with URL path or IP address with path
     http.begin(client, serverName);
     
     // Specify content-type header
     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
     
-    // Prepare your HTTP POST request data
+    // Preparing HTTP POST request data
     String httpRequestData = "api_key=" + apiKeyValue + "&lat=" + String(lat, 8) + "&lng=" + String(lng, 8) + "";
     Serial.print("httpRequestData: ");
     Serial.println(httpRequestData);
@@ -172,7 +164,5 @@ void loop(){
     Serial.println("");
     Serial.print("Connected to WiFi network with IP Address: ");
     Serial.println(WiFi.localIP());;
-    
   }
-
 }
