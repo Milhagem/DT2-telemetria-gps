@@ -30,7 +30,6 @@ TinyGsm modem(SerialAT);
 #include <math.h>
 
 //-----------------------------------Replace with your network credentials----------------------------------------
-//----------------------------------------------------------------------------------------------------------------
 // Replace with your network credentials
 const char* ssid     = "Milhagem";
 const char* password = "ehomilhas";
@@ -62,37 +61,51 @@ String apiKeyValue = "tPmAT5Ab3j7F9";
 #define fatorMili 0.001
 #define fatorMicro 0.000001
 
-// Variaveis do sensor INA226
-INA_Class INA; // Construct a power monitor object names "ina"
-int32_t rawCurrent = -666;
-float corrente_motor_INA;
-uint16_t rawVoltage = 666;
-float tensao_bat_INA;
-int32_t rawShunt = -666;
-float shunt_motor_INA;
-float valorPotencia = 0;
-float valorConsumo = 0;
-float consumoParcial = 0;
+#define ADC_VREF_mV    3300.0  // in millivolt
+#define ADC_RESOLUTION 4096.0
+#define AMPOP_OUT        32    // ESP32 pin connected to LM358P
+#define GAIN              3.89 // AMPOP_OUT = LM35 output * GAIN
 
-//Variaveis de tempo
-long tempoAtual = 0;
-long tempoAnterior = 0;
-long tempoDelta = 0;
+ // ---------- Energy data  ----------
+  // Variaveis do sensor INA226
+  INA_Class INA; // Construct a power monitor object names "ina"
+  int32_t rawCurrent = -666;
+  float corrente_motor_INA;
+  uint16_t rawVoltage = 666;
+  float tensao_bat_INA;
+  int32_t rawShunt = -666;
+  float shunt_motor_INA;
+  float valorPotencia = 0;
+  float valorConsumo = 0;
+  float consumoParcial = 0;
 
-float lat      = 0;
-float lng      = 0;
-float speed    = 0;
-float alt      = 0;
-int   vsat     = 0;
-int   usat     = 0;
-float accuracy = 0;
-int   year     = 0;
-int   month    = 0;
-int   day      = 0;
-int   hour     = 0;
-int   minutos  = 0;
-int   sec      = 0;
-String reading_time = "";
+  //Variaveis de tempo
+  long tempoAtual = 0;
+  long tempoAnterior = 0;
+  long tempoDelta = 0;
+
+ // ---------- GPS data ----------
+  float lat      = 0;
+  float lng      = 0;
+  float speed    = 0;
+  float alt      = 0;
+  int   vsat     = 0;
+  int   usat     = 0;
+  float accuracy = 0;
+  int   year     = 0;
+  int   month    = 0;
+  int   day      = 0;
+  int   hour     = 0;
+  int   minutos  = 0;
+  int   sec      = 0;
+  String reading_time = "";
+
+ // ---------- Temperature data ----------
+  int adcValAmpOp;
+  int adcVal;
+  float milliVolt;
+  int celcius;
+  int farenheits;
 
 SemaphoreHandle_t bufferSemaphore;
 SemaphoreHandle_t displayMutex;       // Lock access to buffer and Serial
@@ -175,6 +188,7 @@ void setup() {
   );
   xTaskCreatePinnedToCore(EnvioDeDadosTask, "Envio De Dados Task", 10000, NULL, 4, NULL, PRO_CPU_NUM);
   xTaskCreatePinnedToCore(INATask, "INA Task", 10000, NULL, 4, NULL, APP_CPU_NUM);
+  xTaskCreatePinnedToCore(TemperaturaTask, "Temperatura Task", 10000, NULL, 4, NULL, APP_CPU_NUM);
 
   // Notify that all tasks have been created (lock Serial with mutex)
   xSemaphoreTake(displayMutex, portMAX_DELAY);
@@ -182,6 +196,22 @@ void setup() {
   xSemaphoreGive(displayMutex);
 
 }//end setup
+//----------------------------------------------------------------------------------------------------------------
+
+void TemperaturaTask(void *pvParameters) {
+  while (true) {
+    // read the ADC value from the temperature OpAmp
+    adcValAmpOp = analogRead(AMPOP_OUT);
+    // converts de ADC value read from the OpAmp into the LM35 original value
+    adcVal = adcValAmpOp / GAIN;
+    // convert the ADC value to voltage in millivolt
+    milliVolt = adcVal * (ADC_VREF_mV / ADC_RESOLUTION);
+    // convert the voltage to the temperature in °C
+    celcius = milliVolt / 10;
+    // convert the °C to °F
+    farenheits = celcius * 9 / 5 + 32;
+  }//while
+}//end Tempertura Task
 //----------------------------------------------------------------------------------------------------------------
 
 void INATask(void *pvParameters) {
@@ -325,7 +355,8 @@ void EnvioDeDadosTask(void *pvParameters) {
       // Prepare your HTTP POST request data
       xSemaphoreTake(bufferSemaphore, portMAX_DELAY);
       String httpRequestData = "api_key=" + apiKeyValue + "&lat=" + String(lat, 8) + "&lng=" + String(lng, 8) + "&tensao_bat_INA=" + String(tensao_bat_INA, 2) +
-      "&corrente_motor_INA=" + String(corrente_motor_INA, 2) + "&valorPotencia=" + String(valorPotencia, 2) + "&valorConsumo=" + String(valorConsumo, 2)  +"" ;
+      "&corrente_motor_INA=" + String(corrente_motor_INA, 2) + "&valorPotencia=" + String(valorPotencia, 2) + "&valorConsumo=" + String(valorConsumo, 2) + 
+      "&celcius=" + String(celcius) + "&farenheits=" + String(farenheits) +"" ;
       xSemaphoreGive(bufferSemaphore);
 
       xSemaphoreTake(displayMutex, portMAX_DELAY);
