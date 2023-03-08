@@ -200,6 +200,7 @@ void setup() {
 
 void TemperaturaTask(void *pvParameters) {
   while (true) {
+    xSemaphoreTake(bufferSemaphore, portMAX_DELAY);
     // read the ADC value from the temperature OpAmp
     adcValAmpOp = analogRead(AMPOP_OUT);
     // converts de ADC value read from the OpAmp into the LM35 original value
@@ -210,6 +211,7 @@ void TemperaturaTask(void *pvParameters) {
     celcius = milliVolt / 10;
     // convert the °C to °F
     farenheits = celcius * 9 / 5 + 32;
+    xSemaphoreGive(bufferSemaphore);
   }//while
 }//end Tempertura Task
 //----------------------------------------------------------------------------------------------------------------
